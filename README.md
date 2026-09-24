@@ -12,38 +12,51 @@ Rank Fusion**. Generation uses **Qwen3.5-0.8B** running locally via
 Hugging Face `transformers`.
 
 The whole project now lives in a **single notebook**
-(`iqbal_poetry_bot.ipynb`), organized into cells you run top to
-bottom. There's a `REBUILD_INDEX` toggle near the top so you only pay
-the cost of rebuilding the dataset/embeddings/FAISS index when your
-source poems actually change — day-to-day, you just run the load
-cells and go straight to chatting.
+(`iqbal_poetry_bot.ipynb`), run top to bottom. There's a
+`REBUILD_INDEX` toggle near the top so you only pay the cost of
+rebuilding the dataset/embeddings/FAISS index when your source poems
+actually change — day-to-day, you can skip straight to loading and
+chatting.
 
 ---
 
 ## How it works
 
 ```
-Cell 1 — Config & imports
-Cell 2 — Build dataset          (skipped if REBUILD_INDEX = False)
-             poems/*.yaml → iqbal_shers.json
-Cell 3 — Build embeddings + FAISS index   (skipped if REBUILD_INDEX = False)
-             iqbal_shers.json → iqbal_shers.faiss, iqbal_shers_embeddings.npy
-Cell 4 — Load dataset, FAISS index, BM25 (always runs)
-Cell 5 — Load Qwen3.5-0.8B + generation config (always runs)
-Cell 6 — hybrid_search() + ask_iqbal_bot() definitions
-Cell 7 — Chat loop
+poems/*.yaml
+     │
+     ▼
+Build dataset            (skipped if REBUILD_INDEX = False)
+     →  iqbal_shers.json
+     │
+     ▼
+Build embeddings + FAISS index   (skipped if REBUILD_INDEX = False)
+     →  iqbal_shers.faiss
+     →  iqbal_shers_embeddings.npy
+     │
+     ▼
+Load dataset, FAISS index, BM25   (always runs)
+     │
+     ▼
+Load Qwen3.5-0.8B + generation config
+     │
+     ▼
+hybrid_search() + ask_iqbal_bot() definitions
+     │
+     ▼
+Interactive chat loop
 ```
 
-Set `REBUILD_INDEX = True` at the top the first time you run the
-notebook, or any time you edit the source YAML poems. Leave it
-`False` on later runs to skip straight to loading the already-built
-JSON/FAISS files and start chatting faster.
+Set `REBUILD_INDEX = True` the first time you run the notebook, or
+any time you edit the source YAML poems. Leave it `False` on later
+runs to skip straight to loading the already-built JSON/FAISS files
+and start chatting faster.
 
 ---
 
 ## Pipeline stages
 
-### 1. Build the dataset (Cell 2)
+### 1. Build the dataset
 
 Reads every `*.yaml` file in `poems_folder`, extracts each sher
 (couplet) with its poem title and ID, and writes a single flat JSON
@@ -66,7 +79,7 @@ strings. It won't catch every kind of stub or junk text in the source
 YAMLs — periodically `grep` your raw files for other obvious
 placeholders and extend the list as needed.
 
-### 2. Build embeddings + FAISS index (Cell 3)
+### 2. Build embeddings + FAISS index
 
 Encodes every sher's text with
 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` and
@@ -80,24 +93,24 @@ degrades search relevance. If you ever add a new encoding step
 elsewhere in the notebook, keep this flag consistent or the FAISS
 scores stop being meaningful.
 
-This cell is skipped when `REBUILD_INDEX = False`. If you ever see a
-size-mismatch warning in Cell 4, it means the JSON changed but this
-cell wasn't re-run — set `REBUILD_INDEX = True` and run again.
+This step is skipped when `REBUILD_INDEX = False`. If you ever see a
+size-mismatch warning when loading, it means the JSON changed but the
+index wasn't rebuilt — set `REBUILD_INDEX = True` and run again.
 
-### 3. Load + hybrid search + chat (Cells 4–7)
+### 3. Load, hybrid search, and chat
 
-- Cell 4 loads the JSON dataset and FAISS index and builds BM25 in
-  memory — this always runs, regardless of the rebuild toggle.
-- Cell 5 loads the Qwen model and fixes up its generation config.
-- **Retrieval (Cell 6):** `hybrid_search()` runs FAISS and BM25
-  independently, then fuses their rankings with **Reciprocal Rank
-  Fusion (RRF)** rather than summing raw scores. Raw BM25 scores and
-  raw FAISS scores live on incompatible scales, so summing them
-  directly lets whichever method produces bigger numbers dominate the
-  ranking regardless of actual relevance. RRF instead scores each
-  candidate by `1 / (rrf_k + rank)` from each method and sums *that*,
-  which only depends on rank position — a standard, scale-independent
-  way to combine two retrieval methods.
+- Loads the JSON dataset and FAISS index and builds BM25 in memory —
+  this always runs, regardless of the rebuild toggle.
+- Loads the Qwen model and fixes up its generation config.
+- **Retrieval:** `hybrid_search()` runs FAISS and BM25 independently,
+  then fuses their rankings with **Reciprocal Rank Fusion (RRF)**
+  rather than summing raw scores. Raw BM25 scores and raw FAISS scores
+  live on incompatible scales, so summing them directly lets whichever
+  method produces bigger numbers dominate the ranking regardless of
+  actual relevance. RRF instead scores each candidate by
+  `1 / (rrf_k + rank)` from each method and sums *that*, which only
+  depends on rank position — a standard, scale-independent way to
+  combine two retrieval methods.
 - **Display:** the retrieved poetry is printed to the user **exactly
   as stored in the JSON** — the LLM never touches this text. This
   guarantees the Urdu verse shown is always authentic and never
@@ -110,7 +123,7 @@ cell wasn't re-run — set `REBUILD_INDEX = True` and run again.
 - Qwen3.5 emits a `<think>...</think>` reasoning block before its real
   answer; `strip_think()` removes it so only the final explanation is
   shown.
-- Cell 7 is the interactive `input()` chat loop.
+- The final section is the interactive `input()` chat loop.
 
 ---
 
@@ -120,22 +133,23 @@ cell wasn't re-run — set `REBUILD_INDEX = True` and run again.
 pip install faiss-cpu rank_bm25 sentence-transformers transformers pyyaml
 ```
 
-Expected file layout (adjust paths in Cell 1 if yours differs):
+Expected file layout (adjust paths at the top of the notebook if
+yours differs):
 
 ```
 /content/drive/MyDrive/project/
 ├── poems/                       # source *.yaml files
 └── output/
-    ├── iqbal_shers.json         # built by Cell 2
-    ├── iqbal_shers.faiss        # built by Cell 3
-    └── iqbal_shers_embeddings.npy  # built by Cell 3
+    ├── iqbal_shers.json
+    ├── iqbal_shers.faiss
+    └── iqbal_shers_embeddings.npy
 ```
 
-**First run:** set `REBUILD_INDEX = True` in Cell 1, then Run All.
+**First run:** set `REBUILD_INDEX = True`, then Run All.
 
 **Later runs (no changes to source poems):** set
 `REBUILD_INDEX = False`, then Run All — this skips the dataset and
-index-building cells and loads the existing files directly, so you
+index-building steps and loads the existing files directly, so you
 reach the chat loop much faster.
 
 ---
@@ -181,7 +195,7 @@ reach the chat loop much faster.
   default of 20, it just gets shadowed.
 - **FAISS index size doesn't match JSON entry count:** set
   `REBUILD_INDEX = True` and re-run — this happens when the dataset
-  changed but the index cell was skipped.
+  changed but the index wasn't rebuilt.
 - **No response printed after a query:** most likely the model is
   still generating (especially on CPU) rather than stuck — errors are
   caught and printed explicitly in the chat loop, so silence usually
