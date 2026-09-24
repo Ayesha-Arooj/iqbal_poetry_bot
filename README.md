@@ -137,7 +137,7 @@ Expected file layout (adjust paths at the top of the notebook if
 yours differs):
 
 ```
-/content/drive/MyDrive/project/
+/content/drive/
 ├── poems/                       # source *.yaml files
 └── output/
     ├── iqbal_shers.json
