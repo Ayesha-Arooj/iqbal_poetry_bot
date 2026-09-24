@@ -18,6 +18,9 @@ rebuilding the dataset/embeddings/FAISS index when your source poems
 actually change — day-to-day, you can skip straight to loading and
 chatting.
 
+**Data source:** the source poems (`poems/*.yaml`) are from
+[AzeemGhumman/iqbal-demystified-dataset](https://github.com/AzeemGhumman/iqbal-demystified-dataset).
+
 ---
 
 ## How it works
@@ -137,7 +140,7 @@ Expected file layout (adjust paths at the top of the notebook if
 yours differs):
 
 ```
-/content/drive/
+/content/drive/MyDrive/project/
 ├── poems/                       # source *.yaml files
 └── output/
     ├── iqbal_shers.json
